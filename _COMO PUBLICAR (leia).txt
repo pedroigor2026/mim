@@ -1,0 +1,19 @@
+COMO PUBLICAR O MIM QUANDO FOR USAR NO CELULAR
+================================================
+
+Esta pasta ja esta pronta e LIMPA (so os arquivos que a internet precisa,
+com a chave de notificacao NOVA). Nao tem arquivo interno vazando.
+
+PASSO 1 - Publicar (no computador):
+  1. Abra o Chrome e va em:  app.netlify.com/drop
+  2. Arraste ESTA PASTA INTEIRA (MIM_PARA_PUBLICAR) pra dentro da pagina.
+  3. Ele te da um endereco tipo  https://algum-nome.netlify.app
+     (Anote esse endereco.)
+
+PASSO 2 - No celular:
+  1. Abra esse endereco no navegador do celular.
+  2. Entre com seu login do MIM.
+  3. Va em  "eu"  ->  "Ativar alarmes neste aparelho"  e aceite a permissao.
+     (iPhone: primeiro instale o app na tela de inicio, depois ative por dentro.)
+
+Pronto - a partir dai a notificacao usa a chave nova.

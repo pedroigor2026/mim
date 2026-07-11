@@ -1,0 +1,13 @@
+{
+  "name": "MIM — Metas Individuais Monitoradas",
+  "short_name": "MIM",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F5F4F7",
+  "theme_color": "#123C63",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
