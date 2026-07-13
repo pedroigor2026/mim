@@ -2102,19 +2102,51 @@ function renderPessoas(){
   $('#pessoas-admin-criar').style.display = admin? 'block':'none';
   $('#pessoas-lista').innerHTML = `<h2>Pessoas (${S.profiles.length})</h2>` + S.profiles.map(p=>{
     const st = statsPessoa(p.id);
-    return `<div class="card" style="cursor:pointer" onclick="abrirPessoa('${p.id}')">
+    const fora = p.ativo === false;
+    return `<div class="card" style="cursor:pointer${fora?';opacity:.55':''}" onclick="abrirPessoa('${p.id}')">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <span style="font-weight:600">${esc(p.nome)||'?'}</span>
-        ${p.is_admin?'<span class="badge b-berry">admin</span>':''}
+        <span>
+          ${p.is_admin?'<span class="badge b-berry">admin</span>':''}
+          ${fora?'<span class="badge b-warn">desligado</span>':''}
+        </span>
       </div>
       <div class="sub" style="font-size:12px;color:var(--muted);margin-top:4px">
         hoje: <b>${st.pendHoje}</b> pendentes · atrasos 30d: <b style="${st.atr30?'color:var(--late)':''}">${st.atr30}</b>
         ${st.conf!==null?` · conformidade 30d: <b style="${st.conf>=80?'color:var(--ok)':'color:var(--warn)'}">${st.conf}%</b>`:''}
         ${st.carga7>15?' · <span class="badge b-warn">sobrecarga</span>':''}
       </div>
+      ${admin && p.id!==S.uid ? `<div style="margin-top:8px">
+        <button class="${fora?'ghost':'danger'}" onclick="event.stopPropagation();desligarPessoa('${p.id}',${fora})">
+          ${fora?'Reativar acesso':'Desligar'}
+        </button>
+      </div>` : ''}
     </div>`;
   }).join('');
 }
+async function desligarPessoa(pid, estaFora){
+  const p = S.profiles.find(x=>x.id===pid); if(!p) return;
+  const nome = p.nome || 'essa pessoa';
+  if (estaFora){
+    if (!confirm(`Devolver o acesso de ${nome} ao MIM?`)) return;
+  } else {
+    if (!confirm(`Desligar ${nome}?\n\nEla perde o acesso na hora: as sessões abertas caem, os alarmes param e ela não consegue mais entrar.\n\nO histórico dela (metas, execuções, evidências) é preservado.`)) return;
+  }
+  const {data, error} = await sb.functions.invoke('admin-users', {
+    body: { acao: estaFora ? 'religar' : 'desligar', user_id: pid }
+  });
+  if (error || data?.error){ alert('Não deu certo: '+(data?.error || error.message)); return; }
+
+  const orfas = data.metas_sem_responsavel || [];
+  if (orfas.length){
+    alert(`${nome} foi desligada.\n\nFicaram ${orfas.length} meta(s) sem responsável — passe pra outra pessoa:\n\n` +
+      orfas.slice(0,10).map(m=>'• '+m.titulo).join('\n') + (orfas.length>10 ? `\n… e mais ${orfas.length-10}` : ''));
+  } else {
+    alert(estaFora ? `${nome} voltou a ter acesso.` : `${nome} foi desligada. Não havia meta em aberto no nome dela.`);
+  }
+  await carregarTudo();
+}
+
 async function abrirPessoa(pid){
   S.pessoaId = pid;
   const p = S.profiles.find(x=>x.id===pid); if(!p) return;
