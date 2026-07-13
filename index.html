@@ -8,6 +8,11 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<!-- o iOS ignora o manifest para o nome do ícone: sem esta linha ele usa o <title>
+     inteiro (ou o endereço do site), que era o "pedroigor...github" na tela inicial -->
+<meta name="apple-mobile-web-app-title" content="MIM">
+<meta name="application-name" content="MIM">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -558,6 +563,11 @@ html[data-tema="escuro"]{
         <input id="fechado-motivo" placeholder="Motivo (ex.: Feriado, Folga)">
         <button class="ghost" id="fechado-add" style="flex:0 0 auto">Adicionar</button>
       </div>
+    </div>
+    <div class="card" id="card-instalar" style="display:none">
+      <h3 style="font-size:15px;margin-bottom:8px">Instalar o MIM neste aparelho</h3>
+      <p style="font-size:12.5px;color:var(--muted)" id="instalar-texto"></p>
+      <div style="margin-top:10px"><button class="primary" id="btn-instalar" style="display:none">Instalar o MIM</button></div>
     </div>
     <div class="card">
       <h3 style="font-size:15px;margin-bottom:8px">Alarmes no aparelho</h3>
@@ -3146,6 +3156,7 @@ async function iniciar(sessao){
     console.error(err);
     alert('Erro ao carregar o app: '+err.message);
   }
+  mostrarConviteDeInstalar();   // iPhone e "já instalado" não disparam beforeinstallprompt
 }
 
 /* ---------- eventos ---------- */
@@ -3153,6 +3164,64 @@ $('#btn-auth').onclick = autenticar;
 $('#form-login').addEventListener('submit', autenticar);
 $$('nav button').forEach(b=> b.onclick = ()=> irPara(b.dataset.v));
 $$('.sidenav button').forEach(b=> b.onclick = ()=>{ irPara(b.dataset.side); fecharMenu(); });
+
+/* ---------- instalar o app ---------- */
+// Salvo como atalho do navegador, o ícone fica com o nome do site ("pedroigor...github")
+// e abre dentro do navegador. Instalado de verdade, fica "MIM", em tela cheia e offline.
+// O navegador só deixa instalar a partir de um toque do usuário — daí o botão.
+let promptInstalar = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  promptInstalar = e;                      // guarda pra disparar no clique
+  mostrarConviteDeInstalar();
+});
+
+function jaInstalado(){
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+function ehIOS(){
+  return /iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+function mostrarConviteDeInstalar(){
+  const card = $('#card-instalar'), txt = $('#instalar-texto'), btn = $('#btn-instalar');
+  if (!card) return;
+
+  if (jaInstalado()){
+    card.style.display = 'block';
+    btn.style.display = 'none';
+    txt.textContent = 'O MIM já está instalado neste aparelho. ✅';
+    return;
+  }
+
+  if (promptInstalar){                     // Android/Chrome: dá pra instalar com um toque
+    card.style.display = 'block';
+    btn.style.display = 'inline-flex';
+    txt.textContent = 'Instale para o ícone ficar com o nome MIM, abrir em tela cheia (sem a barra do navegador) e funcionar offline.';
+    return;
+  }
+
+  if (ehIOS()){                            // iPhone: o Safari não deixa instalar por botão
+    card.style.display = 'block';
+    btn.style.display = 'none';
+    txt.innerHTML = 'No iPhone, use o <b>Safari</b>: toque em <b>Compartilhar</b> (o quadrado com a seta pra cima) ' +
+                    'e escolha <b>“Adicionar à Tela de Início”</b>. O ícone fica com o nome <b>MIM</b>.';
+  }
+}
+
+$('#btn-instalar').onclick = async ()=>{
+  if (!promptInstalar) return;
+  promptInstalar.prompt();
+  const { outcome } = await promptInstalar.userChoice;
+  promptInstalar = null;
+  if (outcome === 'accepted'){
+    $('#instalar-texto').textContent = 'Instalado. Pode fechar esta janela e usar o ícone MIM na tela inicial. ✅';
+    $('#btn-instalar').style.display = 'none';
+  }
+};
+
+window.addEventListener('appinstalled', ()=> mostrarConviteDeInstalar());
 
 /* ---------- menu hambúrguer (celular) ---------- */
 function abrirMenu(){
