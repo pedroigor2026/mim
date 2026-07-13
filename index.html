@@ -816,6 +816,23 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 document.documentElement.dataset.tema = localStorage.getItem('mim_tema') || 'auto';
 
 /* ---------- estado ---------- */
+// localStorage corrompido (aba fechada no meio de uma escrita, extensão, disco cheio)
+// derrubava o app inteiro na abertura: o JSON.parse estourava antes de qualquer render
+// e a tela ficava branca, sem jeito de sair a não ser limpando o navegador na mão.
+function lsLer(chave, padrao){
+  const bruto = localStorage.getItem(chave);
+  if (bruto === null) return padrao;
+  try {
+    const v = JSON.parse(bruto);
+    if (v === null || typeof v !== typeof padrao) throw new Error('tipo inesperado');
+    return v;
+  } catch (err) {
+    console.warn('preferência corrompida em ' + chave + ' — voltando ao padrão', err);
+    localStorage.removeItem(chave);
+    return padrao;
+  }
+}
+
 const S = {
   me: null, profiles: [], atividades: [], setores: [], metas: [],
   execs: [], notifs: [],
@@ -823,7 +840,7 @@ const S = {
   filtroHoje: 'minhas', viewAtual: 'hoje',
   calAno: 0, calMes: 0,
   semBase: null,                                   // ISO da segunda-feira da semana exibida
-  fSem: JSON.parse(localStorage.getItem('mim_fsem')||'{"quem":"minhas","pessoa":"","setor":"","status":""}'),
+  fSem: lsLer('mim_fsem', {quem:'minhas', pessoa:'', setor:'', status:''}),
   editId: null, tipoForm: 'rotina',
   formChk: [],                                     // checklist em edição no form
   inboxConvertId: null,                            // item do inbox sendo transformado em meta
@@ -925,7 +942,9 @@ function listarOcorrencias(deIso, ateIso){
   for (let iso=deIso; iso<=ateIso; iso=addDias(iso,1)) out.push(...ocorrenciasDoDia(iso));
   return out;
 }
-function chkItensDe(metaId){ return S.chkItens.filter(i=>i.meta_id===metaId).sort((a,b)=>a.ordem-b.ordem); }
+// itens removidos continuam no banco (o histórico de execução aponta pra eles),
+// mas não aparecem mais no checklist do dia a dia
+function chkItensDe(metaId){ return S.chkItens.filter(i=>i.meta_id===metaId && !i.removido_em).sort((a,b)=>a.ordem-b.ordem); }
 function chkExecDe(itemId, data){ return S.chkExecs.find(e=>e.item_id===itemId && e.data===data); }
 function evidenciasDe(o){
   return S.evidencias.filter(e=>e.meta_id===o.meta.id && e.data===o.data && (e.marco||null)===(o.marco||null));
@@ -935,7 +954,7 @@ function evidenciasDe(o){
 // A fila é escopada por usuário: sem isso, ações que A fez offline eram enviadas
 // (e ficavam legíveis) na sessão de quem logasse depois no mesmo aparelho.
 function filaKey(){ return S.uid ? 'mim_fila:'+S.uid : null; }
-function fila(){ const k = filaKey(); return k ? JSON.parse(localStorage.getItem(k)||'[]') : []; }
+function fila(){ const k = filaKey(); if (!k) return []; const f = lsLer(k, []); return Array.isArray(f) ? f : []; }
 function filaSalvar(f){ const k = filaKey(); if (!k) return; localStorage.setItem(k, JSON.stringify(f)); atualizarIndicadorOffline(); }
 // A chave antiga não guardava de quem era a fila. Não dá pra atribuir a ninguém: quarentena.
 function quarentenarFilaLegada(){
@@ -1117,7 +1136,9 @@ function renderHoje(){
   const feitasR = doDiaR.filter(o=>statusDe(o)==='ok').length;
   const pct = doDiaR.length ? Math.round(feitasR/doDiaR.length*100) : 100;
   const prox = doDiaR.find(o=>o.meta.horario && statusDe(o)==='pend');
-  const hr = new Date().getHours();
+  // hora de São Paulo (horaSP() devolve "HH:MM"), não a do aparelho: um celular com
+  // fuso errado dava "Boa noite" às 10 da manhã.
+  const hr = Number(horaSP().slice(0,2));
   const saud = hr<12?'Bom dia':hr<18?'Boa tarde':'Boa noite';
   const stk = streakPessoal();
   $('#hoje-resumo').innerHTML = `<div class="card" style="background:var(--berry-dark);color:#fff;border:none">
@@ -2154,14 +2175,20 @@ async function abrirPessoa(pid){
   const {data: fbs} = await sb.from('feedbacks').select('*').eq('pessoa_id', pid).order('created_at',{ascending:false}).limit(30);
   const IC = {feedback:'💬', reconhecimento:'🏆', treinamento:'🎓', acordo:'🤝'};
   // rotinas que essa pessoa mais atrasa (30d)
-  const falhas = {};
+  // agrupa por ID, não por título: duas metas diferentes com o mesmo nome
+  // ("Conferir caixa", p.ex.) eram somadas como se fossem a mesma.
+  const falhas = {}, falhaTitulo = {};
   for (let i=1;i<=30;i++){
     for (const o of ocorrenciasDoDia(addDias(hojeISO(),-i))){
       const envolvido = (o.meta.executantes||[]).includes(pid);
-      if (envolvido && statusDe(o)==='late') falhas[o.meta.titulo] = (falhas[o.meta.titulo]||0)+1;
+      if (envolvido && statusDe(o)==='late'){
+        falhas[o.meta.id] = (falhas[o.meta.id]||0)+1;
+        falhaTitulo[o.meta.id] = o.meta.titulo;
+      }
     }
   }
-  const topFalhas = Object.entries(falhas).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const topFalhas = Object.entries(falhas).sort((a,b)=>b[1]-a[1]).slice(0,3)
+    .map(([id,n]) => [falhaTitulo[id], n]);
 
   let html = `<h3>${esc(p.nome)} ${p.is_admin?'<span class="badge b-berry">admin</span>':''}</h3>
     <div class="dash-grid" style="margin-bottom:12px">
@@ -2758,7 +2785,10 @@ async function salvarMeta(){
     const antes = chkItensDe(metaId).map(i=>i.id);
     const mantidos = S.formChk.filter(i=>i.id).map(i=>i.id);
     const removidos = antes.filter(id=>!mantidos.includes(id));
-    if (removidos.length) await sb.from('checklist_itens').delete().in('id', removidos);
+    // Marca como removido em vez de apagar: apagar o item levava junto (CASCADE) todo
+    // o histórico de quem já tinha cumprido aquele item.
+    if (removidos.length) await sb.from('checklist_itens')
+      .update({removido_em: new Date().toISOString()}).in('id', removidos);
     for (let i=0;i<S.formChk.length;i++){
       const it = S.formChk[i];
       if (!it.texto.trim()) continue;
