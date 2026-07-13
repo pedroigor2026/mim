@@ -1073,7 +1073,8 @@ async function carregarTudo(){
     sb.from('checklist_itens').select('*'),
     sb.from('checklist_execucoes').select('*').gte('data', addDias(hojeISO(), -60)),
     sb.from('projeto_etapas').select('*').order('ordem'),
-    sb.from('bloqueios').select('*').order('created_at'),
+    // bloqueio resolvido há muito tempo não interessa pra tela; só os abertos e os recentes
+    sb.from('bloqueios').select('*').or(`resolvido_em.is.null,created_at.gte.${new Date(Date.now()-120*86400000).toISOString()}`).order('created_at'),
     sb.from('evidencias').select('*').gte('data', addDias(hojeISO(), -60)),
     sb.from('inbox_itens').select('*').is('organizado_em', null).order('created_at',{ascending:false}),
     sb.from('dias_fechados').select('*').order('data'),
