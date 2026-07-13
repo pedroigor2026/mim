@@ -3,6 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Content Security Policy.
+     O 'unsafe-inline' em script-src é necessário enquanto o app usar onclick inline
+     (tirar isso é o ARC-010, uma reescrita grande). Mesmo assim, o que esta política
+     garante já vale muito: se algum dia entrar um XSS aqui, ele NÃO consegue carregar
+     script de outro domínio, nem mandar os dados para fora (connect-src só aceita o
+     Supabase), nem embutir o MIM num iframe de terceiro. -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com;
+  img-src 'self' data: blob: https://jecuwudvclhvgrdnsyqc.supabase.co;
+  connect-src 'self' https://jecuwudvclhvgrdnsyqc.supabase.co wss://jecuwudvclhvgrdnsyqc.supabase.co;
+  worker-src 'self';
+  manifest-src 'self';
+  object-src 'none';
+  base-uri 'self';
+  form-action 'self';
+">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<script>
+  // frame-ancestors só vale via header HTTP, e o GitHub Pages não deixa configurar header.
+  // Sem isto, um site qualquer podia embutir o MIM num iframe invisível e induzir a
+  // pessoa a clicar em coisas dentro dele (clickjacking).
+  if (window.top !== window.self) window.top.location = window.self.location;
+</script>
 <title>MIM® — Metas Individuais Monitoradas</title>
 <meta name="theme-color" content="#123C63">
 <link rel="manifest" href="manifest.webmanifest">
@@ -839,7 +865,16 @@ html[data-tema="escuro"]{
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- Versão FIXA e com verificação de integridade.
+     Antes era "@supabase/supabase-js@2": qualquer versão nova entrava sozinha no app.
+     Uma release quebrada (ou a CDN comprometida) rodaria aqui dentro, com acesso à
+     sessão do usuário e ao banco. Agora o navegador recusa o arquivo se ele mudar
+     um único byte. Para atualizar: trocar a versão E o integrity juntos. -->
+<script
+  src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2/dist/umd/supabase.min.js"
+  integrity="sha384-sgcvElP/LlNRtORGYFLO/9K/bENcpJK19HgvqslWXog6d8f/Va4TpltGiBlGntCM"
+  crossorigin="anonymous"
+  referrerpolicy="no-referrer"></script>
 <script>
 /* =====================================================
    CONFIGURAÇÃO — cole os dados do seu projeto Supabase
