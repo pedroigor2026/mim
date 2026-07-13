@@ -100,8 +100,10 @@ button.danger{background:transparent; border:1px solid var(--late); color:var(--
 .filtros select{width:auto; flex:1; min-width:110px; padding:8px 10px; font-size:13px}
 
 /* ---------- semana (cockpit) ---------- */
-.week{display:flex; gap:8px; overflow-x:auto; scroll-snap-type:x proximity; padding-bottom:8px}
-.wday{flex:0 0 190px; scroll-snap-align:start; background:var(--pend-soft); border-radius:12px; padding:8px}
+/* no celular a semana empilha e rola pra baixo (como o Google Agenda).
+   Antes eram 7 colunas de 190px lado a lado: obrigava a arrastar pros lados. */
+.week{display:flex; flex-direction:column; gap:8px; padding-bottom:8px}
+.wday{flex:none; width:100%; background:var(--pend-soft); border-radius:12px; padding:8px}
 .wday.today{outline:2px solid var(--berry)}
 .wday h4{font-size:12.5px; font-weight:700; text-transform:capitalize; color:var(--muted); padding:2px 4px 8px; display:flex; justify-content:space-between}
 .wday .card{padding:8px 10px; margin-bottom:6px}
@@ -110,6 +112,8 @@ button.danger{background:transparent; border:1px solid var(--late); color:var(--
 .wday .task .chk{width:24px;height:24px;font-size:12px}
 .wsec{font-size:10.5px; font-weight:700; text-transform:uppercase; color:var(--muted); margin:8px 4px 4px}
 @media (min-width:1000px){ .week{display:grid; grid-template-columns:repeat(7,1fr); overflow:visible} .wday{flex:none} }
+/* dia sem nada não precisa de um bloco alto no celular */
+@media (max-width:999px){ .wday:not(.today) .wsec{margin-top:4px} .wday h4{padding-bottom:4px} }
 
 /* ---------- agenda ---------- */
 .cal-head{display:flex; align-items:center; justify-content:space-between; margin:6px 2px 10px}
@@ -205,6 +209,13 @@ nav button .ic{font-size:19px; line-height:1}
 nav button .tab-label{font-size:10.5px; font-weight:600}
 nav button.on{color:var(--berry)}
 
+/* ---------- menu hambúrguer (só no celular; no desktop a lateral fica fixa) ---------- */
+#btn-menu{
+  display:none; background:none; border:none; color:#fff;
+  font-size:22px; line-height:1; padding:2px 4px; cursor:pointer;
+}
+#menu-fundo{ display:none }
+
 /* ---------- sidebar lateral ---------- */
 .sidenav{
   position:fixed; left:0; top:0; bottom:0; width:180px; z-index:25;
@@ -220,12 +231,33 @@ nav button.on{color:var(--berry)}
 .sidenav button .ic{font-size:17px}
 header, main{ margin-left:180px }
 @media (max-width:700px){
-  .sidenav{ width:60px; padding:14px 6px }
-  .sidenav .brand{ display:none }
-  .sidenav button .label{ display:none }
-  .sidenav button{ justify-content:center; padding:12px 0 }
-  header, main{ margin-left:60px }
-  nav{ left:60px }
+  /* no celular a lateral vira gaveta: fica escondida e entra deslizando pelo ☰.
+     Antes era uma faixa de ícones de 60px, sempre ali, comendo a largura da tela. */
+  .sidenav{
+    width:250px; padding:18px 10px;
+    transform:translateX(-100%);
+    transition:transform .22s ease;
+    box-shadow:2px 0 16px rgba(0,0,0,.18);
+  }
+  .sidenav.aberta{ transform:translateX(0) }
+  .sidenav .brand{ display:block; font-size:26px }
+  .sidenav button .label{ display:inline }
+  .sidenav button{ justify-content:flex-start; padding:12px }
+  header, main{ margin-left:0 }
+  nav{ left:0 }
+  #btn-menu{ display:block }
+  #menu-fundo{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:24 }
+  #menu-fundo.aberta{ display:block }
+
+  /* no celular sobram ~390px: 2 e 3 colunas fixas espremiam tudo (dashboard e relatórios) */
+  .row2, .row3{ grid-template-columns:1fr }
+  .dash-grid{ grid-template-columns:repeat(auto-fill,minmax(132px,1fr)); gap:8px }
+  .stat{ padding:10px }
+  .stat .n{ font-size:22px }
+  .filtros{ flex-wrap:wrap }
+  .filtros select{ min-width:0; flex:1 1 46% }
+  main{ padding-left:10px; padding-right:10px }
+  table{ display:block; overflow-x:auto; -webkit-overflow-scrolling:touch }
 }
 nav .nbadge{
   position:absolute; margin-left:22px; margin-top:-2px;
@@ -327,8 +359,12 @@ html[data-tema="escuro"]{
   <button data-side="dash"><span class="ic">📊</span><span class="label">Dashboard</span></button>
   <button data-side="rel"><span class="ic">📈</span><span class="label">Relatórios</span></button>
 </aside>
+<div id="menu-fundo"></div>
 <header>
-  <div class="brand">MIM<sup>®</sup><small>METAS INDIVIDUAIS MONITORADAS · por Paulo Serrano</small></div>
+  <div style="display:flex;align-items:center;gap:10px;min-width:0">
+    <button id="btn-menu" aria-label="Menu">☰</button>
+    <div class="brand">MIM<sup>®</sup><small>METAS INDIVIDUAIS MONITORADAS · por Paulo Serrano</small></div>
+  </div>
   <div style="display:flex;align-items:center;gap:10px">
     <span id="hdr-off">offline</span>
     <button id="btn-busca" aria-label="Buscar" style="background:none;border:none;color:#fff;font-size:17px;padding:2px">🔍</button>
@@ -1060,6 +1096,7 @@ async function carregarTudo(){
   S.confModelos = confM.data||[];
   S.confRuns  = confR.data||[];
   S.me = S.profiles.find(p=>p.id===S.uid) || S.me;
+  aplicarPermissoes();
   renderTudo();
 }
 // avisos de atraso agora são gerados NO SERVIDOR (função push, todo dia ~07:00),
@@ -2124,11 +2161,16 @@ function renderPessoas(){
   $('#pessoas-lista').innerHTML = `<h2>Pessoas (${S.profiles.length})</h2>` + S.profiles.map(p=>{
     const st = statsPessoa(p.id);
     const fora = p.ativo === false;
+    const adminVencido = p.is_admin && p.admin_ate && new Date(p.admin_ate) <= new Date();
+    const ehAdmin = p.is_admin && !adminVencido;
+    const temporario = ehAdmin && p.admin_ate;
     return `<div class="card" style="cursor:pointer${fora?';opacity:.55':''}" onclick="abrirPessoa('${p.id}')">
       <div style="display:flex;align-items:center;justify-content:space-between">
         <span style="font-weight:600">${esc(p.nome)||'?'}</span>
         <span>
-          ${p.is_admin?'<span class="badge b-berry">admin</span>':''}
+          ${ehAdmin ? (temporario
+            ? `<span class="badge b-berry">admin até ${fmtBR(p.admin_ate.slice(0,10))}</span>`
+            : '<span class="badge b-berry">admin</span>') : ''}
           ${fora?'<span class="badge b-warn">desligado</span>':''}
         </span>
       </div>
@@ -2139,6 +2181,9 @@ function renderPessoas(){
       </div>
       ${admin && p.id!==S.uid ? `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
         ${!fora ? `<button class="ghost" onclick="event.stopPropagation();gerarLinkAcesso('${p.id}')">Gerar link de acesso</button>` : ''}
+        ${!fora ? `<button class="ghost" onclick="event.stopPropagation();mudarPapel('${p.id}',${ehAdmin})">
+          ${ehAdmin ? 'Tirar admin' : 'Tornar admin'}
+        </button>` : ''}
         <button class="${fora?'ghost':'danger'}" onclick="event.stopPropagation();desligarPessoa('${p.id}',${fora})">
           ${fora?'Reativar acesso':'Desligar'}
         </button>
@@ -2146,6 +2191,47 @@ function renderPessoas(){
     </div>`;
   }).join('');
 }
+async function mudarPapel(pid, ehAdmin){
+  const p = S.profiles.find(x=>x.id===pid); if(!p) return;
+  const nome = p.nome || 'essa pessoa';
+
+  if (ehAdmin){
+    if (!confirm(`Tirar o acesso de administrador de ${nome}?\n\nEla continua usando o MIM normalmente, mas perde o poder de criar contas, desligar gente, mexer em setores e ver a auditoria.`)) return;
+    const {data, error} = await sb.functions.invoke('admin-users', { body:{ acao:'rebaixar', user_id: pid } });
+    if (error || data?.error){ alert('Não deu certo: '+(data?.error || error.message)); return; }
+    alert(`${nome} não é mais administradora.`);
+    await carregarTudo();
+    return;
+  }
+
+  const resp = prompt(
+    `Tornar ${nome} administradora.\n\n` +
+    `Por quantos DIAS? (ex.: 7)\n` +
+    `Deixe VAZIO para administrador permanente (sem prazo).\n\n` +
+    `Administrador pode: criar contas, desligar pessoas, mexer em setores e categorias, fechar dias e ver a auditoria.`,
+    '7'
+  );
+  if (resp === null) return;
+
+  const dias = resp.trim() === '' ? null : Number(resp.trim());
+  if (dias !== null && (!Number.isFinite(dias) || dias < 1 || dias > 365)){
+    alert('Prazo inválido. Use um número de 1 a 365 dias, ou deixe vazio para permanente.');
+    return;
+  }
+
+  const motivo = prompt(`Por quê? (fica registrado — ex.: "cobrindo férias da Ana")`, '') || '';
+
+  const {data, error} = await sb.functions.invoke('admin-users', {
+    body: { acao:'promover', user_id: pid, dias, motivo }
+  });
+  if (error || data?.error){ alert('Não deu certo: '+(data?.error || error.message)); return; }
+
+  alert(dias
+    ? `${nome} é administradora por ${dias} dia(s).\n\nO poder cai sozinho em ${fmtBR(data.admin_ate.slice(0,10))} — você não precisa lembrar de tirar.`
+    : `${nome} é administradora, sem prazo.\n\nPara tirar depois, use o botão "Tirar admin".`);
+  await carregarTudo();
+}
+
 async function gerarLinkAcesso(pid){
   const p = S.profiles.find(x=>x.id===pid); if(!p) return;
   const {data, error} = await sb.functions.invoke('admin-users', { body: { acao:'novo_link', user_id: pid } });
@@ -2952,7 +3038,30 @@ async function removerSetor(id){
 }
 
 /* ---------- navegação e sheets ---------- */
+// Telas que mostram os dados de TODO MUNDO (desempenho, atrasos, conformidade de cada
+// pessoa). Quem não é admin vê só o que é dele — não a régua dos colegas.
+const VIEWS_ADMIN = ['pessoas', 'dash', 'rel'];
+
+function souAdmin(){
+  const p = S.me;
+  if (!p?.is_admin) return false;
+  if (p.admin_ate && new Date(p.admin_ate) <= new Date()) return false;  // prazo venceu
+  return true;
+}
+
+// esconde os botões das telas de admin de quem não é admin
+function aplicarPermissoes(){
+  const admin = souAdmin();
+  $$('.sidenav button').forEach(b=>{
+    if (VIEWS_ADMIN.includes(b.dataset.side)) b.style.display = admin ? '' : 'none';
+  });
+  if (!admin && VIEWS_ADMIN.includes(S.viewAtual)) irPara('hoje');
+}
+
 function irPara(v){
+  // trava de verdade: esconder o botão não basta (o banco também barra, mas a tela
+  // não pode nem tentar montar a lista de todo mundo)
+  if (VIEWS_ADMIN.includes(v) && !souAdmin()) v = 'hoje';
   S.viewAtual = v;
   $$('.view').forEach(x=>x.classList.remove('active'));
   $('#view-'+v).classList.add('active');
@@ -3043,7 +3152,22 @@ async function iniciar(sessao){
 $('#btn-auth').onclick = autenticar;
 $('#form-login').addEventListener('submit', autenticar);
 $$('nav button').forEach(b=> b.onclick = ()=> irPara(b.dataset.v));
-$$('.sidenav button').forEach(b=> b.onclick = ()=> irPara(b.dataset.side));
+$$('.sidenav button').forEach(b=> b.onclick = ()=>{ irPara(b.dataset.side); fecharMenu(); });
+
+/* ---------- menu hambúrguer (celular) ---------- */
+function abrirMenu(){
+  $('.sidenav').classList.add('aberta');
+  $('#menu-fundo').classList.add('aberta');
+}
+function fecharMenu(){
+  $('.sidenav').classList.remove('aberta');
+  $('#menu-fundo').classList.remove('aberta');
+}
+$('#btn-menu').onclick = ()=>{
+  $('.sidenav').classList.contains('aberta') ? fecharMenu() : abrirMenu();
+};
+$('#menu-fundo').onclick = fecharMenu;
+document.addEventListener('keydown', e=>{ if (e.key==='Escape') fecharMenu(); });
 $$('#seg-hoje button').forEach(b=> b.onclick = ()=>{
   S.filtroHoje = b.dataset.f;
   $$('#seg-hoje button').forEach(x=>x.classList.toggle('on', x===b));
