@@ -3161,14 +3161,19 @@ $('#nova-pessoa-criar').onclick = async ()=>{
   // conta criada no servidor (Edge Function) — signup público fica desligado
   const { data, error } = await sb.functions.invoke('admin-users', { body: { nome, email } });
   if (error || data?.error){ alert('Não foi possível criar: '+(data?.error || error.message)); return; }
-  if (!data.link){   // Edge Function ainda é a versão antiga, a que devolvia senha
-    alert('A função admin-users no Supabase ainda não foi atualizada: ela não devolveu link de convite.\nAtualize a Edge Function antes de criar contas por aqui.');
-    return;
-  }
-  $('#np-r-email').textContent = data.email;
-  $('#np-r-link').textContent = data.link;
-  $('#nova-pessoa-resultado').style.display = 'block';
+
   $('#nova-pessoa-nome').value=''; $('#nova-pessoa-email').value='';
+
+  if (data.enviado){
+    $('#nova-pessoa-resultado').style.display = 'none';
+    alert(`Convite enviado por e-mail para ${data.email}.\n\nEla recebe uma mensagem do MIM, clica no link e escolhe a própria senha.\n\nSe não chegar em alguns minutos, peça pra ela olhar o spam — ou use "Gerar link de acesso" na lista abaixo.`);
+  } else {
+    // e-mail não saiu: cai no link, mas avisando do problema do WhatsApp
+    $('#np-r-email').textContent = data.email;
+    $('#np-r-link').textContent = data.link || '';
+    $('#nova-pessoa-resultado').style.display = 'block';
+    alert((data.aviso || 'O e-mail não saiu.') + '\n\nUse o link que apareceu. Atenção: mande o link em uma mensagem SEPARADA no WhatsApp — se ele gerar a prévia, o convite queima.');
+  }
   await carregarTudo();
 };
 
