@@ -238,11 +238,11 @@ nav .nbadge{
 }
 
 /* ---------- login ---------- */
-#screen-login{max-width:400px; margin:0 auto; padding:12vh 24px 40px; display:none}
-#screen-login.active{display:block}
-#screen-login .brand{color:var(--berry-dark); font-size:40px; text-align:center}
-#screen-login .brand small{color:var(--muted); font-size:12px}
-#screen-login form{margin-top:26px}
+#screen-login,#screen-senha{max-width:400px; margin:0 auto; padding:12vh 24px 40px; display:none}
+#screen-login.active,#screen-senha.active{display:block}
+#screen-login .brand,#screen-senha .brand{color:var(--berry-dark); font-size:40px; text-align:center}
+#screen-login .brand small,#screen-senha .brand small{color:var(--muted); font-size:12px}
+#screen-login form,#screen-senha form{margin-top:26px}
 #screen-login .swap{margin-top:16px; text-align:center; font-size:13.5px; color:var(--muted)}
 #screen-login .swap a{color:var(--berry); font-weight:600; cursor:pointer}
 
@@ -298,6 +298,20 @@ html[data-tema="escuro"]{
     <div class="form-err" id="login-err"></div>
     <div style="margin-top:18px"><button class="primary" id="btn-auth">Entrar</button></div>
     <p style="text-align:center;color:var(--muted);font-size:12.5px;margin-top:14px">Conta nova? Peça ao admin em Pessoas.</p>
+  </form>
+</div>
+
+<!-- ============ DEFINIR SENHA (primeiro acesso via convite) ============ -->
+<div id="screen-senha">
+  <div class="brand">MIM<sup>®</sup><small>METAS INDIVIDUAIS MONITORADAS · por Paulo Serrano</small></div>
+  <form id="form-senha" onsubmit="return false">
+    <p style="color:var(--muted);font-size:13.5px;margin-top:8px">Bem-vindo. Escolha uma senha só sua — ninguém mais vai saber qual é, nem o administrador.</p>
+    <label>Nova senha (mínimo 8 caracteres)</label>
+    <input id="f-senha-nova" type="password" autocomplete="new-password" minlength="8" required>
+    <label>Repita a senha</label>
+    <input id="f-senha-nova2" type="password" autocomplete="new-password" minlength="8" required>
+    <div class="form-err" id="senha-err"></div>
+    <div style="margin-top:18px"><button class="primary" id="btn-def-senha">Definir senha e entrar</button></div>
   </form>
 </div>
 
@@ -408,7 +422,11 @@ html[data-tema="escuro"]{
 
   <!-- CHECKLISTS -->
   <section class="view" id="view-checklists">
-    <div class="h-row"><h2>Checklists / padrões</h2><button class="ghost" onclick="novaMeta('rotina')">+ Nova rotina</button></div>
+    <div class="h-row"><h2>Checklists de conformidade</h2><button class="ghost" onclick="novoConfModelo()">+ Novo modelo</button></div>
+    <p style="font-size:12.5px;color:var(--muted);margin:0 2px 10px">Verifique uma atividade item a item e receba a <b>% de conformidade</b> (Conforme / Não conforme / N.A., com peso por item).</p>
+    <div id="conf-modelos"></div>
+    <div id="conf-historico"></div>
+    <div class="h-row" style="margin-top:24px"><h3 style="margin:0;font-size:15px">Padrões de metas (SOP)</h3><button class="ghost" onclick="novaMeta('rotina')">+ Nova rotina</button></div>
     <p style="font-size:12.5px;color:var(--muted);margin:0 2px 10px">Metas com checklist. Edite a meta para mudar os itens do padrão.</p>
     <div id="checklists-lista"></div>
   </section>
@@ -425,8 +443,10 @@ html[data-tema="escuro"]{
       <div style="margin-top:10px"><button class="ghost" id="nova-pessoa-criar">Criar conta</button></div>
       <div id="nova-pessoa-resultado" style="display:none;margin-top:12px;padding:10px;background:var(--pend-soft);border-radius:8px;font-size:13px">
         <div>Login: <b id="np-r-email"></b></div>
-        <div>Senha: <b id="np-r-senha"></b></div>
-        <div style="color:var(--muted);margin-top:6px">Copie e envie pro WhatsApp da pessoa.</div>
+        <div style="margin-top:6px">Link de convite — a pessoa define a própria senha ao abrir:</div>
+        <div id="np-r-link" style="word-break:break-all;font-family:monospace;font-size:11.5px;margin:4px 0"></div>
+        <button class="ghost" id="np-r-copiar">Copiar link</button>
+        <div style="color:var(--muted);margin-top:6px">Envie o link pra pessoa. Você não vê e não define a senha dela.</div>
       </div>
     </div>
   </section>
@@ -743,6 +763,36 @@ html[data-tema="escuro"]{
   <div id="busca-res" style="margin-top:10px"></div>
 </div>
 
+<!-- ============ SHEET: modelo de checklist (conformidade) ============ -->
+<div class="sheet-bg" id="bg-confmodelo"></div>
+<div class="sheet" id="sheet-confmodelo">
+  <div class="grab"></div>
+  <h3 id="confmodelo-titulo">Novo modelo de checklist</h3>
+  <label>Nome do checklist</label>
+  <input id="confmodelo-nome" placeholder="Ex.: Higiene da cozinha">
+  <label style="margin-top:10px">Itens a verificar</label>
+  <div id="confmodelo-itens"></div>
+  <button class="ghost" style="width:100%;margin-top:6px" onclick="confAddItem()">+ Adicionar item</button>
+  <div class="form-err" id="confmodelo-err"></div>
+  <div style="margin-top:16px;display:flex;gap:8px">
+    <button class="ghost" style="flex:1" onclick="fecharSheets()">Cancelar</button>
+    <button class="primary" style="flex:1" onclick="salvarConfModelo()">Salvar modelo</button>
+  </div>
+</div>
+
+<!-- ============ SHEET: aplicar checklist (conformidade) ============ -->
+<div class="sheet-bg" id="bg-confrun"></div>
+<div class="sheet" id="sheet-confrun">
+  <div class="grab"></div>
+  <h3 id="confrun-titulo"></h3>
+  <div id="confrun-pct" style="text-align:center;padding:8px 0 12px"></div>
+  <div id="confrun-itens"></div>
+  <div id="confrun-acoes" style="margin-top:16px;display:flex;gap:8px">
+    <button class="ghost" style="flex:1" onclick="fecharSheets()">Cancelar</button>
+    <button class="primary" style="flex:1" onclick="salvarConfRun()">Salvar aplicação</button>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 /* =====================================================
@@ -882,8 +932,22 @@ function evidenciasDe(o){
 }
 
 /* ---------- fila offline ---------- */
-function fila(){ return JSON.parse(localStorage.getItem('mim_fila')||'[]'); }
-function filaSalvar(f){ localStorage.setItem('mim_fila', JSON.stringify(f)); atualizarIndicadorOffline(); }
+// A fila é escopada por usuário: sem isso, ações que A fez offline eram enviadas
+// (e ficavam legíveis) na sessão de quem logasse depois no mesmo aparelho.
+function filaKey(){ return S.uid ? 'mim_fila:'+S.uid : null; }
+function fila(){ const k = filaKey(); return k ? JSON.parse(localStorage.getItem(k)||'[]') : []; }
+function filaSalvar(f){ const k = filaKey(); if (!k) return; localStorage.setItem(k, JSON.stringify(f)); atualizarIndicadorOffline(); }
+// A chave antiga não guardava de quem era a fila. Não dá pra atribuir a ninguém: quarentena.
+function quarentenarFilaLegada(){
+  const raw = localStorage.getItem('mim_fila');
+  if (raw === null) return;
+  localStorage.removeItem('mim_fila');
+  let n = 0;
+  try { n = JSON.parse(raw).length; } catch { return; }
+  if (!n) return;
+  localStorage.setItem('mim_fila_orfa', raw);
+  alert(`Havia ${n} ação(ões) feita(s) offline neste aparelho sem registro de quem as fez.\nPor segurança elas NÃO foram aplicadas na sua conta. Se eram suas, refaça-as.`);
+}
 function atualizarIndicadorOffline(){
   const off = !navigator.onLine, n = fila().length;
   const el = $('#hdr-off');
@@ -948,6 +1012,8 @@ async function carregarTudo(){
     sb.from('evidencias').select('*').gte('data', addDias(hojeISO(), -60)),
     sb.from('inbox_itens').select('*').is('organizado_em', null).order('created_at',{ascending:false}),
     sb.from('dias_fechados').select('*').order('data'),
+    sb.from('conf_modelos').select('*').order('created_at'),
+    sb.from('conf_runs').select('*').order('created_at',{ascending:false}).limit(300),
   ]);
   const erro = res.find(r=>r.error);
   if (erro){
@@ -958,7 +1024,7 @@ async function carregarTudo(){
     }
     alert('Erro ao carregar dados: '+erro.error.message); return;
   }
-  const [prof, ativ, metas, exec, notifs, setores, chkI, chkE, etapas, bloq, evid, inbox, dfech] = res;
+  const [prof, ativ, metas, exec, notifs, setores, chkI, chkE, etapas, bloq, evid, inbox, dfech, confM, confR] = res;
   S.profiles  = prof.data||[];
   S.atividades= ativ.data||[];
   S.metas     = (metas.data||[]).map(m=>({...m, executantes:(m.meta_executantes||[]).map(x=>x.profile_id)}));
@@ -972,6 +1038,8 @@ async function carregarTudo(){
   S.evidencias= evid.data||[];
   S.inbox     = inbox.data||[];
   S.diasFechados = dfech.data||[];
+  S.confModelos = confM.data||[];
+  S.confRuns  = confR.data||[];
   S.me = S.profiles.find(p=>p.id===S.uid) || S.me;
   renderTudo();
 }
@@ -1749,6 +1817,151 @@ function renderChecklists(){
     </div>`;
   }
   $('#checklists-lista').innerHTML = html || `<div class="empty">Nenhuma meta com checklist. Edite uma meta e adicione itens de checklist para criar um padrão (SOP).</div>`;
+  renderConfModelos(); renderConfHistorico();
+}
+
+/* ================= CHECKLISTS DE CONFORMIDADE (banco, com RLS — ver migrations/011) =================
+   Modelo (nome + itens com peso) -> Aplicar (Conforme/Não conforme/N.A.) -> % de
+   conformidade = (peso dos Conforme) / (peso dos aplicáveis) x 100. N.A. sai da conta.
+   S.confModelos e S.confRuns são preenchidos em carregarTudo(); recarregarConf() atualiza os dois. */
+function confModelos(){ return S.confModelos||[]; }
+function confRuns(){ return S.confRuns||[]; }
+async function recarregarConf(){
+  const [m,r] = await Promise.all([
+    sb.from('conf_modelos').select('*').order('created_at'),
+    sb.from('conf_runs').select('*').order('created_at',{ascending:false}).limit(300),
+  ]);
+  if (m.error || r.error){ alert('Erro ao recarregar conformidade: '+(m.error||r.error).message); return; }
+  S.confModelos = m.data||[];
+  S.confRuns = r.data||[];
+  renderConfModelos(); renderConfHistorico();
+}
+function confPct(marc, itens){
+  let aplic=0, ok=0;
+  itens.forEach((it,i)=>{ const e=marc[i]; if(e!=='ok'&&e!=='nao') return; const p=+it.peso||1; aplic+=p; if(e==='ok') ok+=p; });
+  return aplic>0 ? Math.round(ok/aplic*100) : null;
+}
+function confGrade(pct){
+  if(pct==null) return {txt:'sem itens avaliados', cor:'var(--muted)'};
+  if(pct>=90) return {txt:'Aprovado', cor:'#2e9e5b'};
+  if(pct>=70) return {txt:'Atenção', cor:'#e0a52e'};
+  return {txt:'Reprovado', cor:'#d64545'};
+}
+function renderConfModelos(){
+  const el=$('#conf-modelos'); if(!el) return;
+  const ms=confModelos();
+  el.innerHTML = ms.length ? ms.map(m=>`
+    <div class="card">
+      <div class="title">✅ ${esc(m.nome)}</div>
+      <div class="sub">${m.itens.length} ${m.itens.length===1?'item':'itens'}</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="primary" style="flex:1" onclick="aplicarConfModelo('${m.id}')">Aplicar</button>
+        <button class="ghost" onclick="editarConfModelo('${m.id}')">Editar</button>
+      </div>
+    </div>`).join('') : `<div class="empty">Nenhum modelo ainda. Toque em “+ Novo modelo” pra criar seu primeiro checklist.</div>`;
+}
+function renderConfHistorico(){
+  const el=$('#conf-historico'); if(!el) return;
+  const rs=confRuns().slice().sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,10);
+  if(!rs.length){ el.innerHTML=''; return; }
+  el.innerHTML = `<div class="h-row" style="margin-top:18px"><h3 style="margin:0;font-size:15px">Últimas aplicações</h3></div>` + rs.map(r=>{
+    const g=confGrade(r.pct);
+    return `<div class="card" style="cursor:pointer" onclick="verConfRun('${r.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <div><div class="title" style="font-size:14px">${esc(r.nome)}</div><div class="sub">${r.data}</div></div>
+        <div style="text-align:right"><div style="font-size:22px;font-weight:800;color:${g.cor};line-height:1">${r.pct==null?'—':r.pct+'%'}</div><div style="font-size:11px;color:${g.cor};font-weight:700">${g.txt}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function novoConfModelo(){ S.confEdit={dbId:null, nome:'', itens:[{texto:'',categoria:'',peso:3}]}; abrirConfModeloSheet('Novo modelo de checklist'); }
+function editarConfModelo(id){
+  const m=confModelos().find(x=>x.id===id); if(!m) return;
+  S.confEdit={dbId:m.id, nome:m.nome, itens:JSON.parse(JSON.stringify(m.itens||[]))};
+  if(!S.confEdit.itens.length) S.confEdit.itens=[{texto:'',categoria:'',peso:3}];
+  abrirConfModeloSheet('Editar checklist');
+}
+function abrirConfModeloSheet(titulo){
+  $('#confmodelo-titulo').textContent=titulo;
+  $('#confmodelo-nome').value=S.confEdit.nome;
+  $('#confmodelo-err').textContent='';
+  renderConfModeloItens(); abrirSheet('confmodelo');
+}
+function renderConfModeloItens(){
+  $('#confmodelo-itens').innerHTML = S.confEdit.itens.map((it,i)=>`
+    <div class="card" style="padding:10px;margin-bottom:8px">
+      <input placeholder="O que verificar (ex.: Bancada limpa e sanitizada)" value="${esc(it.texto)}" oninput="S.confEdit.itens[${i}].texto=this.value">
+      <div class="row2" style="margin-top:6px">
+        <input placeholder="Categoria (opcional)" value="${esc(it.categoria||'')}" oninput="S.confEdit.itens[${i}].categoria=this.value">
+        <select onchange="S.confEdit.itens[${i}].peso=+this.value">
+          ${[1,2,3,4,5].map(p=>`<option value="${p}" ${(+it.peso===p)?'selected':''}>peso ${p}</option>`).join('')}
+        </select>
+      </div>
+      <div style="text-align:right;margin-top:4px"><button class="ghost" style="padding:4px 10px;font-size:12px" onclick="confRemItem(${i})">remover</button></div>
+    </div>`).join('');
+}
+function confAddItem(){ S.confEdit.itens.push({texto:'',categoria:'',peso:3}); renderConfModeloItens(); }
+function confRemItem(i){ S.confEdit.itens.splice(i,1); if(!S.confEdit.itens.length) S.confEdit.itens.push({texto:'',categoria:'',peso:3}); renderConfModeloItens(); }
+async function salvarConfModelo(){
+  const nome=$('#confmodelo-nome').value.trim();
+  const itens=S.confEdit.itens.filter(it=>it.texto.trim()).map(it=>({texto:it.texto.trim(), categoria:(it.categoria||'').trim(), peso:+it.peso||1}));
+  if(!nome){ $('#confmodelo-err').textContent='Dê um nome ao checklist.'; return; }
+  if(!itens.length){ $('#confmodelo-err').textContent='Adicione pelo menos um item.'; return; }
+  let error;
+  if (S.confEdit.dbId){
+    ({error} = await sb.from('conf_modelos').update({nome, itens}).eq('id', S.confEdit.dbId));
+  } else {
+    ({error} = await sb.from('conf_modelos').insert({nome, itens, criado_por: S.uid}));
+  }
+  if (error){ $('#confmodelo-err').textContent='Erro ao salvar: '+error.message; return; }
+  fecharSheets();
+  await recarregarConf();
+}
+function aplicarConfModelo(id){
+  const m=confModelos().find(x=>x.id===id); if(!m) return;
+  S.confRun={modelo_id:m.id, nome:m.nome, itens:JSON.parse(JSON.stringify(m.itens)), marc:m.itens.map(()=>null), obs:m.itens.map(()=>'')};
+  $('#confrun-titulo').textContent=m.nome;
+  $('#confrun-acoes').style.display='flex';
+  renderConfRunItens(); atualizarConfRunPct(); abrirSheet('confrun');
+}
+function renderConfRunItens(){
+  const r=S.confRun;
+  $('#confrun-itens').innerHTML = r.itens.map((it,i)=>{
+    const e=r.marc[i];
+    const btn=(val,txt,cor)=>`<button onclick="confMarcar(${i},'${val}')" style="flex:1;padding:8px 4px;border-radius:8px;border:1px solid var(--line);font-size:12.5px;font-weight:700;cursor:pointer;background:${e===val?cor:'transparent'};color:${e===val?'#fff':'var(--ink)'}">${txt}</button>`;
+    return `<div class="card" style="padding:10px;margin-bottom:8px">
+      <div style="font-size:14px;font-weight:600">${esc(it.texto)}</div>
+      <div class="sub">${it.categoria?esc(it.categoria)+' · ':''}peso ${it.peso}</div>
+      <div style="display:flex;gap:6px;margin-top:8px">${btn('ok','Conforme','#2e9e5b')}${btn('nao','Não conforme','#d64545')}${btn('na','N.A.','#8a8a8a')}</div>
+      <input placeholder="Observação (opcional)" value="${esc(r.obs[i]||'')}" oninput="S.confRun.obs[${i}]=this.value" style="margin-top:6px">
+    </div>`;
+  }).join('');
+}
+function confMarcar(i,val){ S.confRun.marc[i]=(S.confRun.marc[i]===val?null:val); renderConfRunItens(); atualizarConfRunPct(); }
+function atualizarConfRunPct(){
+  const pct=confPct(S.confRun.marc,S.confRun.itens); const g=confGrade(pct);
+  $('#confrun-pct').innerHTML=`<div style="font-size:34px;font-weight:800;color:${g.cor};line-height:1">${pct==null?'—':pct+'%'}</div><div style="font-weight:700;color:${g.cor}">${g.txt}</div>`;
+}
+async function salvarConfRun(){
+  const r=S.confRun; const pct=confPct(r.marc,r.itens);
+  const itensSnapshot=r.itens.map((it,i)=>({texto:it.texto, categoria:it.categoria, peso:it.peso, estado:r.marc[i], obs:r.obs[i]||''}));
+  const {error} = await sb.from('conf_runs').insert({
+    modelo_id:r.modelo_id, nome:r.nome, data:hojeISO(), pct, itens:itensSnapshot, criado_por:S.uid
+  });
+  if (error){ alert('Erro ao salvar aplicação: '+error.message); return; }
+  fecharSheets();
+  await recarregarConf();
+}
+function verConfRun(id){
+  const r=confRuns().find(x=>x.id===id); if(!r) return;
+  const g=confGrade(r.pct); const lab={ok:'Conforme',nao:'Não conforme',na:'N.A.'};
+  const reprov=r.itens.filter(it=>it.estado==='nao');
+  $('#confrun-titulo').textContent=r.nome+' · '+r.data;
+  $('#confrun-acoes').style.display='none';
+  $('#confrun-pct').innerHTML=`<div style="font-size:34px;font-weight:800;color:${g.cor};line-height:1">${r.pct==null?'—':r.pct+'%'}</div><div style="font-weight:700;color:${g.cor}">${g.txt}</div>`;
+  $('#confrun-itens').innerHTML = (reprov.length?`<div class="card" style="border-color:#d64545"><b style="color:#d64545">Não conformes (${reprov.length}) — corrigir:</b>${reprov.map(it=>`<div style="margin-top:4px;font-size:13.5px">✗ ${esc(it.texto)}${it.obs?` — <span style="color:var(--muted)">${esc(it.obs)}</span>`:''}</div>`).join('')}</div>`:'') +
+    r.itens.map(it=>`<div class="card" style="padding:8px 10px"><div style="font-size:13.5px">${esc(it.texto)}</div><div class="sub" style="color:${it.estado==='ok'?'#2e9e5b':it.estado==='nao'?'#d64545':'var(--muted)'}">${lab[it.estado]||'não avaliado'}${it.obs?' · '+esc(it.obs):''}</div></div>`).join('');
+  abrirSheet('confrun');
 }
 
 /* ---------- PROJETO (detalhe) ---------- */
@@ -2701,8 +2914,17 @@ function traduzErro(m){
   return m;
 }
 async function iniciar(sessao){
-  if (!sessao){ $('#app').style.display='none'; $('#screen-login').classList.add('active'); return; }
+  if (!sessao){ $('#app').style.display='none'; $('#screen-senha').classList.remove('active'); $('#screen-login').classList.add('active'); return; }
+  // convidado que ainda não escolheu senha: não entra no app antes de escolher
+  if (sessao.user.user_metadata?.convite_pendente === true){
+    $('#app').style.display='none';
+    $('#screen-login').classList.remove('active');
+    $('#screen-senha').classList.add('active');
+    return;
+  }
   S.uid = sessao.user.id;
+  quarentenarFilaLegada();
+  $('#screen-senha').classList.remove('active');
   $('#screen-login').classList.remove('active');
   $('#app').style.display='block';
   const hoje = new Date();
@@ -2791,7 +3013,14 @@ $('#setor-add').onclick = async ()=>{
   await carregarTudo();
 };
 $('#fechado-add').onclick = addFechado;
-$('#btn-sair').onclick = async ()=>{ await sb.auth.signOut(); location.reload(); };
+$('#btn-sair').onclick = async ()=>{
+  if (navigator.onLine && fila().length){
+    try{ await flushFila(); }catch(err){ console.error(err); }
+  }
+  if (fila().length && !confirm(`Você tem ${fila().length} ação(ões) offline ainda não sincronizada(s).\nElas ficam guardadas e só serão enviadas quando você entrar de novo NESTE aparelho.\n\nSair mesmo assim?`)) return;
+  await sb.auth.signOut();
+  location.reload();
+};
 
 /* ---------- alarmes (Web Push) ---------- */
 const VAPID_PUBLIC = 'BHjRmpyPy0RgCExLVHK4yMMUZib5aaDJ9BxedYpTtkr5h7UGSgK5Y2sGWVArGQOPCG-D5BdUIV2BPR-dBdZ0eBQ';
@@ -2833,11 +3062,37 @@ $('#nova-pessoa-criar').onclick = async ()=>{
   // conta criada no servidor (Edge Function) — signup público fica desligado
   const { data, error } = await sb.functions.invoke('admin-users', { body: { nome, email } });
   if (error || data?.error){ alert('Não foi possível criar: '+(data?.error || error.message)); return; }
+  if (!data.link){   // Edge Function ainda é a versão antiga, a que devolvia senha
+    alert('A função admin-users no Supabase ainda não foi atualizada: ela não devolveu link de convite.\nAtualize a Edge Function antes de criar contas por aqui.');
+    return;
+  }
   $('#np-r-email').textContent = data.email;
-  $('#np-r-senha').textContent = data.senha;
+  $('#np-r-link').textContent = data.link;
   $('#nova-pessoa-resultado').style.display = 'block';
   $('#nova-pessoa-nome').value=''; $('#nova-pessoa-email').value='';
   await carregarTudo();
+};
+
+$('#np-r-copiar').onclick = async ()=>{
+  const btn = $('#np-r-copiar');
+  try{
+    await navigator.clipboard.writeText($('#np-r-link').textContent);
+    btn.textContent = 'Copiado!';
+    setTimeout(()=>{ btn.textContent = 'Copiar link'; }, 1500);
+  }catch(err){
+    alert('Não consegui copiar sozinho. Selecione o link e copie na mão.');
+  }
+};
+
+$('#btn-def-senha').onclick = async ()=>{
+  const s1 = $('#f-senha-nova').value, s2 = $('#f-senha-nova2').value;
+  const err = $('#senha-err');
+  err.textContent = '';
+  if (s1.length < 8){ err.textContent = 'A senha precisa de pelo menos 8 caracteres.'; return; }
+  if (s1 !== s2){ err.textContent = 'As duas senhas não são iguais.'; return; }
+  const {error} = await sb.auth.updateUser({ password: s1, data: { convite_pendente: false } });
+  if (error){ err.textContent = traduzErro(error.message); return; }
+  location.reload();
 };
 
 sb.auth.onAuthStateChange((ev, sessao)=>{

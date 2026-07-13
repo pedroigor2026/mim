@@ -1,5 +1,5 @@
 // mim — service worker (Fase 2: instalável + casca offline; ações offline ficam na fila do app)
-const CACHE = 'mim-v11';
+const CACHE = 'mim-v12';
 const SHELL = ['./index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
