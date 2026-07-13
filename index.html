@@ -2137,7 +2137,8 @@ function renderPessoas(){
         ${st.conf!==null?` · conformidade 30d: <b style="${st.conf>=80?'color:var(--ok)':'color:var(--warn)'}">${st.conf}%</b>`:''}
         ${st.carga7>15?' · <span class="badge b-warn">sobrecarga</span>':''}
       </div>
-      ${admin && p.id!==S.uid ? `<div style="margin-top:8px">
+      ${admin && p.id!==S.uid ? `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        ${!fora ? `<button class="ghost" onclick="event.stopPropagation();gerarLinkAcesso('${p.id}')">Gerar link de acesso</button>` : ''}
         <button class="${fora?'ghost':'danger'}" onclick="event.stopPropagation();desligarPessoa('${p.id}',${fora})">
           ${fora?'Reativar acesso':'Desligar'}
         </button>
@@ -2145,6 +2146,22 @@ function renderPessoas(){
     </div>`;
   }).join('');
 }
+async function gerarLinkAcesso(pid){
+  const p = S.profiles.find(x=>x.id===pid); if(!p) return;
+  const {data, error} = await sb.functions.invoke('admin-users', { body: { acao:'novo_link', user_id: pid } });
+  if (error || data?.error){ alert('Não deu certo: '+(data?.error || error.message)); return; }
+
+  try { await navigator.clipboard.writeText(data.link); } catch(err) { /* copia manual abaixo */ }
+  prompt(
+    `Link de acesso de ${p.nome || data.email} — já está copiado.\n\n` +
+    `IMPORTANTE: o link só vale UMA vez. O WhatsApp abre o link sozinho pra montar a prévia e queima o convite.\n` +
+    `Mande assim: escreva algo antes (ex.: "seu acesso ao MIM:") e mande o link em uma mensagem SEPARADA.\n` +
+    `Se mesmo assim não funcionar, é só gerar outro aqui.\n\n` +
+    `Se não copiou, copie daqui:`,
+    data.link
+  );
+}
+
 async function desligarPessoa(pid, estaFora){
   const p = S.profiles.find(x=>x.id===pid); if(!p) return;
   const nome = p.nome || 'essa pessoa';
@@ -2975,8 +2992,28 @@ function traduzErro(m){
   if (/at least/i.test(m)) return 'A senha precisa de pelo menos 8 caracteres.';
   return m;
 }
+// O link de convite é de uso único — e o WhatsApp (como quase todo mensageiro)
+// pré-carrega links para montar o preview, o que QUEIMA o token antes de a pessoa
+// clicar. Quando isso acontece o Supabase devolve o erro no hash da URL. Sem isto,
+// o app simplesmente mostrava a tela de login, sem explicar nada.
+function erroDeLinkNaURL(){
+  const h = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+  const cod = h.get('error_code') || '';
+  const desc = h.get('error_description') || '';
+  if (!cod && !desc) return null;
+  history.replaceState(null, '', location.pathname + location.search);
+  if (/expired|otp_expired|invalid/i.test(cod + desc)) {
+    return 'Este link de convite já foi usado ou expirou.\n\nIsso costuma acontecer quando o link é aberto pelo WhatsApp, que carrega o link sozinho para mostrar a prévia — e gasta o convite.\n\nPeça um link novo ao administrador.';
+  }
+  return 'Não consegui usar este link: ' + (desc || cod);
+}
+
 async function iniciar(sessao){
-  if (!sessao){ $('#app').style.display='none'; $('#screen-senha').classList.remove('active'); $('#screen-login').classList.add('active'); return; }
+  if (!sessao){
+    const problema = erroDeLinkNaURL();
+    if (problema) alert(problema);
+    $('#app').style.display='none'; $('#screen-senha').classList.remove('active'); $('#screen-login').classList.add('active'); return;
+  }
   // convidado que ainda não escolheu senha: não entra no app antes de escolher
   if (sessao.user.user_metadata?.convite_pendente === true){
     $('#app').style.display='none';
