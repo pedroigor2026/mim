@@ -918,6 +918,7 @@ const S = {
   me: null, profiles: [], atividades: [], setores: [], metas: [],
   execs: [], notifs: [],
   chkItens: [], chkExecs: [], etapas: [], bloqueios: [], evidencias: [], inbox: [],
+  metaVersoes: [],                                 // a regra de cada meta, por período de validade
   filtroHoje: 'minhas', viewAtual: 'hoje',
   calAno: 0, calMes: 0,
   semBase: null,                                   // ISO da segunda-feira da semana exibida
@@ -976,10 +977,40 @@ function rotinaCai(m, iso){
   }
   return false;
 }
+/* ---------- a meta COMO ELA ERA num dia ---------- */
+// Sem isto, o app recalculava o passado com a regra de HOJE: mudar uma rotina de segunda
+// para terça fazia os atrasos das segundas passadas sumirem e criava atrasos novos em
+// terças em que ninguém foi cobrado. Trocar o responsável reescrevia o histórico dizendo
+// que ele sempre foi o responsável. Agora cada dia é lido com a regra que valia nele.
+function versaoEm(metaId, iso){
+  return S.metaVersoes.find(v =>
+    v.meta_id === metaId && v.valido_de <= iso && (!v.valido_ate || iso <= v.valido_ate));
+}
+function metaEm(m, iso){
+  const v = versaoEm(m.id, iso);
+  if (!v) return m;                       // meta sem versão (não deveria acontecer): usa a atual
+  return {
+    ...m,
+    tipo:               v.tipo ?? m.tipo,
+    periodicidade:      v.periodicidade,
+    dias_semana:        v.dias_semana,
+    dia_mes:            v.dia_mes,
+    horario:            v.horario,
+    vigencia_inicio:    v.vigencia_inicio,
+    vigencia_fim:       v.vigencia_fim,
+    data_inicio:        v.data_inicio,
+    data_intermediaria: v.data_intermediaria,
+    data_final:         v.data_final,
+    responsavel_id:     v.responsavel_id ?? m.responsavel_id,
+    executantes:        v.executantes || [],
+  };
+}
+
 function ocorrenciasDoDia(iso){
   const out = [];
-  for (const m of S.metas){
-    if (!metaAtiva(m)) continue;
+  for (const atual of S.metas){
+    if (!metaAtiva(atual)) continue;
+    const m = metaEm(atual, iso);         // a regra e as pessoas daquele dia, não as de hoje
     if (m.tipo==='rotina' && rotinaCai(m, iso)) out.push({meta:m, data:iso, marco:null});
     if (m.tipo==='tarefa' && m.data_final===iso) out.push({meta:m, data:iso, marco:null});
     if (m.tipo==='projeto'){
@@ -1115,6 +1146,8 @@ async function carregarTudo(){
     sb.from('dias_fechados').select('*').order('data'),
     sb.from('conf_modelos').select('*').order('created_at'),
     sb.from('conf_runs').select('*').order('created_at',{ascending:false}).limit(300),
+    // a regra que valia em cada época — é o que impede o passado de ser reescrito
+    sb.from('meta_versoes').select('*').order('valido_de'),
   ]);
   const erro = res.find(r=>r.error);
   if (erro){
@@ -1125,7 +1158,8 @@ async function carregarTudo(){
     }
     alert('Erro ao carregar dados: '+erro.error.message); return;
   }
-  const [prof, ativ, metas, exec, notifs, setores, chkI, chkE, etapas, bloq, evid, inbox, dfech, confM, confR] = res;
+  const [prof, ativ, metas, exec, notifs, setores, chkI, chkE, etapas, bloq, evid, inbox, dfech, confM, confR, vers] = res;
+  S.metaVersoes = vers.data||[];
   S.profiles  = prof.data||[];
   S.atividades= ativ.data||[];
   S.metas     = (metas.data||[]).map(m=>({...m, executantes:(m.meta_executantes||[]).map(x=>x.profile_id)}));
